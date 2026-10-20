@@ -1,0 +1,6 @@
+startgroup
+    animation_start os-window-focus-in
+    animation_stop os-window-focus-out
+    animation_step 33
+    shaders ascii-sharks
+endgroup
