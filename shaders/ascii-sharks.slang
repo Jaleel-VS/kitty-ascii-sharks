@@ -10,7 +10,7 @@ import kitty_custom_shader_types;
 
 // ---- tunables (override with `var` in a pipeline file) ----
 static const float2 CELL_PX = float2(16.0, 26.0); // glyph cell size in device pixels
-static const int NUM_SHARKS = 4;                  // up to 8
+static const int NUM_SHARKS = 5;                  // up to 8; species cycle classic, hammerhead, tiger, mako, thresher
 static const float SHARK_LENGTH = 0.6;            // length of the nearest shark, in window heights
 static const float SPEED = 1.0;                   // swim speed multiplier
 static const float OPACITY = 0.85;                // opacity of the nearest shark
@@ -106,6 +106,7 @@ struct Shape {
     float2 gills;
     float4 head;     // cephalofoil: half-span, sweep, depth, notch; zero span for none
     bool barred;
+    float whip;      // where a thresher's whip tail starts, 0 for none
     float3 tint;
 };
 
@@ -114,6 +115,7 @@ shark_shape(int kind) {
     Shape sh;
     sh.head = float4(0.0);
     sh.barred = false;
+    sh.whip = 0.0;
     if (kind == 1) { // hammerhead
         sh.pectoral = float4(0.17, 0.4, 0.5, 0.22);
         sh.pelvic = float4(0.56, 0.63, 0.67, 0.075);
@@ -143,6 +145,16 @@ shark_shape(int kind) {
         sh.eye = 0.13;
         sh.gills = float2(0.2, 0.3);
         sh.tint = float3(0.78, 0.9, 1.2);
+    } else if (kind == 4) { // thresher: compact body, upper tail lobe as long as the shark
+        sh.pectoral = float4(0.12, 0.27, 0.36, 0.2);
+        sh.pelvic = float4(0.37, 0.41, 0.44, 0.045);
+        sh.caudal = 0.0;
+        sh.dorsal = float2(0.24, 0.32);
+        sh.second_dorsal = float2(0.45, 0.47);
+        sh.eye = 0.075;
+        sh.gills = float2(0.11, 0.18);
+        sh.whip = 0.48;
+        sh.tint = float3(1.0, 0.9, 1.08);
     } else { // classic
         sh.pectoral = float4(0.15, 0.43, 0.55, 0.26);
         sh.pelvic = float4(0.57, 0.65, 0.69, 0.085);
@@ -188,6 +200,13 @@ half_width(int kind, float s) {
         float k = (s - 0.86) / 0.14;
         return 0.014 * (1.0 - k) + 0.01 * sin(k * PI);
     }
+    if (kind == 4) {
+        if (s < 0.08) return 0.07 * pow(sin(s / 0.08 * PI * 0.5), 0.75);
+        if (s < 0.2) return 0.07 + 0.02 * smoothstep(0.08, 0.2, s);
+        if (s < 0.48) return 0.012 + 0.078 * pow(1.0 - (s - 0.2) / 0.28, 1.3);
+        float k = (s - 0.48) / 0.52; // the whip: thin, with a slight sickle swell
+        return 0.012 * (1.0 - k) + 0.006 * sin(k * PI * 0.9) + 0.002;
+    }
     return classic_half_width(s);
 }
 
@@ -205,10 +224,14 @@ int
 classify(int kind, Shape sh, float s, float y, float margin, out float n) {
     float ay = abs(y);
     float hw = half_width(kind, s);
+    // The whip is far thinner than a cell; keep it one cell wide so it reads as a line
+    bool whip = sh.whip > 0.0 && s > sh.whip && s <= 1.0;
+    if (whip) hw = max(hw, margin * 0.9 * (1.0 - 0.5 * smoothstep(0.85, 1.0, s)));
     n = 0.0;
 
     if (hw > 0.0 && ay <= hw) {
         n = y / hw;
+        if (whip) return FLAG_FIN;
         if (sh.eye > 0.0 && length(float2(s - sh.eye, ay - hw * 0.6)) < max(0.018, margin * 0.6)) return FLAG_EYE;
         if (s > sh.gills.x && s < sh.gills.y && ay > hw * 0.5 &&
             frac((s - sh.gills.x) / (sh.gills.y - sh.gills.x) * 4.0) < 0.4) return FLAG_GILL;
@@ -273,7 +296,8 @@ shark_pixel(int i, float2 px, float2 cell, float2 c, float aspect, float vh, flo
     float z = (float(i) + 1.0) / float(NUM_SHARKS); // nearer sharks are bigger and more opaque
     float L = SHARK_LENGTH * lerp(0.55, 1.0, z);
     float alpha = OPACITY * lerp(0.5, 1.0, z);
-    int kind = i % 4;
+    int kind = i % 5;
+    if (kind == 4) L *= 1.35; // half of a thresher is tail
 
     float4 h = float4(hash12(float2(i, 1.7)), hash12(float2(i, 9.3)), hash12(float2(i, 4.1)), hash12(float2(i, 6.6)));
     float pad = 1.4 * L; // off-screen room, so the whole shark is hidden when it wraps
@@ -304,7 +328,7 @@ shark_pixel(int i, float2 px, float2 cell, float2 c, float aspect, float vh, flo
         float sp = length(v);
         float2 perp = float2(-v.y, v.x) / sp;
         float s = float(k) / float(SPINE);
-        float wiggle = 0.045 * L * (0.2 + s * s) * sin(swim - s * TAU * 0.9);
+        float wiggle = (kind == 4 ? 0.07 : 0.045) * L * (0.2 + s * s) * sin(swim - s * TAU * 0.9);
         q[k] = float2(p.x0 - p.dir * p.vx * (tau - tt), path_y(p, tt)) + perp * wiggle;
         tt -= seg / sp;
     }

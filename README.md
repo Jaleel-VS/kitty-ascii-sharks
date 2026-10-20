@@ -4,7 +4,7 @@ ASCII sharks that swim behind your terminal text, as a [kitty](https://sw.kovidg
 
 ![ascii sharks swimming in kitty](assets/demo.gif)
 
-Four species (classic, hammerhead, tiger, mako) cross the window in lanes, tails beating. Each shark is drawn as a grid of shaded cells with a pixel-font glyph in each: sparse `:;t` on lit skin, dense `8#@` in shadow, `o` eyes, `.'` soft edges and the odd accent colour. Terminal text and coloured cells stay on top.
+Five species (classic, hammerhead, tiger, mako, and a thresher with a whip tail as long as its body) cross the window in lanes, tails beating. Each shark is drawn as a grid of shaded cells with a pixel-font glyph in each: sparse `:;t` on lit skin, dense `8#@` in shadow, `o` eyes, `.'` soft edges and the odd accent colour. Terminal text and coloured cells stay on top.
 
 Everything is procedural; there are no textures or fonts to load. It runs on the GPU and costs nothing while the window is unfocused.
 
@@ -55,7 +55,7 @@ endgroup
 | Parameter | Default | Effect |
 |---|---|---|
 | `CELL_PX` | `float2(16, 26)` | glyph cell size in device pixels |
-| `NUM_SHARKS` | `4` | number of sharks |
+| `NUM_SHARKS` | `5` | number of sharks; species cycle classic, hammerhead, tiger, mako, thresher, so 5+ includes the thresher |
 | `SHARK_LENGTH` | `0.6` | length of the nearest shark, in window heights |
 | `SPEED` | `1.0` | swim speed multiplier |
 | `OPACITY` | `0.85` | opacity of the nearest shark; farther ones are fainter |
